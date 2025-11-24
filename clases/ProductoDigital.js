@@ -1,4 +1,13 @@
+// =========================
+// Clase ProductoDigital
+// =========================
+
+// IMPORTAMOS la clase padre
+
 const Producto = require("./Producto");
+
+// Esta clase hereda de Producto y añade tamañoDescarga (en MB).
+// Usamos "extends" para herencia y "super" para llamar al constructor padre.
 
 class ProductoDigital extends Producto {
 
