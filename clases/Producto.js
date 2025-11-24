@@ -1,3 +1,11 @@
+// =========================
+// Clase Producto
+// =========================
+
+// Esta clase representa un producto genérico.
+// Contiene nombre, precio y stock.
+// Además tiene un método para calcular el IVA (21%).
+
 class Producto {
 
 
@@ -9,6 +17,7 @@ class Producto {
 
     }
 
+   
 
    calcularIVA(porcentajeIva) {
 
