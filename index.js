@@ -20,7 +20,7 @@ async function main() {
         console.log("Libro digital insertado: ", ebookDB);
 
     } catch (err) {
-        console.error("Error al conectar con la BBDD");
+        console.error("Error al conectar con la BBDD", err);
     }
 
 
