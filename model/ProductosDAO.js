@@ -68,7 +68,7 @@ async function insertarProductoDigital(ProductoDigital){
 
     return {
         ...resultProd[0], 
-        tamano_Descarga_mb: resultProdDigital[0].tamano_descarga_mb
+        tamano_descarga_mb: resultProdDigital.rows[0].tamano_descarga_mb
     }
 
 
