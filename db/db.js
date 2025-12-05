@@ -1,31 +1,30 @@
-// Importamos la clase Pool desde la librería 'pg' (node-postgres).
-// Pool permite gestionar un "grupo" de conexiones a PostgreSQL,
-// lo cual mejora el rendimiento frente a abrir y cerrar conexiones manualmente.
-const { Pool } = require("pg");
+const Producto = require("./clases/Producto");
+const ProductoDigital = require("./clases/ProductoDigital");
+const pDAO = require("./model/ProductosDAO")
+
+async function main() {
 
 
-// Creamos una instancia del Pool.
-// Esta será la conexión reutilizable que usará toda la app para consultar la BD.
-const pool = new Pool({
+    try {
 
-    // Usuario con el que nos conectamos a PostgreSQL.
-    user: "postgres",
-
-    // Dirección del servidor donde está PostgreSQL.
-    // Si la BD está en el mismo equipo → localhost.
-    host: "localhost",
-
-    // Nombre de la base de datos a la que queremos conectarnos.
-    database: "productos",
-
-    // Contraseña del usuario.
-    password: "Poopoo34.",
-
-    // Puerto donde escucha PostgreSQL (por defecto: 5432).
-    port: 5432
-});
+        const libro = new Producto("Andrea Valenti", 30, 20);
+        const ebook = new ProductoDigital("Andrea Valenti", 10, 999, 120);
 
 
-// Exportamos el pool para que otros archivos (index.js, repositorios, etc.)
-// puedan usarlo simplemente con: const pool = require("./db");
-module.exports = pool;
+        console.log("Libro:", libro);
+        console.log("Libro Digital:", ebook);
+
+        const libroDB = await pDAO.insertarProducto(libro);
+        console.log("Libro insertado: ", libroDB);
+        const ebookDB = await pDAO.insertarProductoDigital(ebook);
+        console.log("Libro digital insertado: ", ebookDB);
+
+    } catch (err) {
+        console.error("Error al conectar con la BBDD", err);
+    }
+
+
+
+}
+
+main();
