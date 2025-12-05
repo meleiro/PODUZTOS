@@ -1,6 +1,6 @@
 // Importamos el pool de conexión a PostgreSQL desde db.js
 // Este "pool" permite ejecutar consultas a la base de datos.
-const pool = require("../db");
+const pool = require("../db/db");
 
 // Importamos las clases POO usadas en la aplicación.
 // No se necesitan directamente dentro de esta función,
@@ -39,3 +39,42 @@ async function insertarProducto(producto) {
     return result.rows[0];
 }
 
+async function insertarProductoDigital(ProductoDigital){
+
+    const { nombre, precio, stock, tamañoDescarga} = ProductoDigital;
+    
+    const resultProd = await pool.query(
+
+        `INSERT INTO productos (nombre, precio, stock, tipo)
+         VALUES ($1, $2, $3, 'DIGITAL')       
+         RETURNING *`,                       
+
+        // Valores que queremos insertar: los ponemos en el mismo orden que $1, $2, $3
+        [nombre, precio, stock]
+    );
+
+    const productoId = resultProd.rows[0].id;
+
+     const resultProdDigital = await pool.query(
+
+        `INSERT INTO productos_digitales (producto_id, tamano_descarga_mb)
+         VALUES ($1, $2)       
+         RETURNING *`,                       
+
+        // Valores que queremos insertar: los ponemos en el mismo orden que $1, $2, $3
+        [productoId , tamañoDescarga]
+    );
+
+
+    return {
+        ...resultProd[0], 
+        tamano_Descarga_mb: resultProdDigital[0].tamano_descarga_mb
+    }
+
+
+}
+
+module.exports = {
+    insertarProducto,
+    insertarProductoDigital
+}
