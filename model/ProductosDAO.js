@@ -1,12 +1,12 @@
 // Importamos el pool de conexión a PostgreSQL desde db.js
 // Este "pool" permite ejecutar consultas a la base de datos.
-const pool = require("./db");
+const pool = require("../db");
 
 // Importamos las clases POO usadas en la aplicación.
 // No se necesitan directamente dentro de esta función,
 // pero normalmente se usan para crear o validar objetos antes de insertarlos.
-const Producto = require("./clases/Producto");
-const ProductoDigital = require("./clases/ProductoDigital");
+const Producto = require("../clases/Producto");
+const ProductoDigital = require("../clases/ProductoDigital");
 
 
 // =======================================================
@@ -38,3 +38,4 @@ async function insertarProducto(producto) {
     // Como RETURNING devuelve una sola fila, accedemos a la primera: rows[0].
     return result.rows[0];
 }
+
