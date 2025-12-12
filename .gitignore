@@ -1,0 +1,24 @@
+# Dependencias Node.js
+node_modules/
+
+# Archivos de entorno
+.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Salida de pruebas
+coverage/
+
+# Configuración de VS Code
+.vscode/
+
+# Archivos temporales
+*.tmp
+
+# MacOS
+.DS_Store

@@ -1,0 +1,14 @@
+[
+  {
+    "nombre": "Libro 2019",
+    "precio": 30,
+    "stock": 12,
+    "morcilla": 12
+  },
+  {
+    "nombre": "Libro 2019",
+    "precio": 30,
+    "stock": 12,
+    "tamDescarga": 45.12
+  }
+]
