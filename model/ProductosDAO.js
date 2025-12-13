@@ -22,7 +22,7 @@ async function insertarProducto(producto) {
     // Extraemos nombre, precio y stock de "producto".
     // Ejemplo: producto = { nombre: "Libro", precio: 30, stock: 10 }
     const { nombre, precio, stock } = producto;
-   
+
     // Ejecutamos una consulta SQL con parámetros.
     // - pool.query ejecuta la consulta sobre la BD.
     // - Usamos $1, $2, $3 como placeholders para los valores reales,
@@ -32,7 +32,7 @@ async function insertarProducto(producto) {
 
         `INSERT INTO productos (nombre, precio, stock, tipo)
          VALUES ($1, $2, $3, 'FISICO')       
-         RETURNING *`,                       
+         RETURNING *`,
 
         // Array con los valores que sustituyen a $1, $2, $3 en orden.
         [nombre, precio, stock]
@@ -58,13 +58,13 @@ async function insertarProductoDigital(ProductoDigital) {
     // Se espera que el objeto tenga estas propiedades:
     // { nombre, precio, stock, tamañoDescarga }
     const { nombre, precio, stock, tamañoDescarga } = ProductoDigital;
-    
+
     // 1) Insertamos en la tabla general de productos como tipo 'DIGITAL'.
     const resultProd = await pool.query(
 
         `INSERT INTO productos (nombre, precio, stock, tipo)
          VALUES ($1, $2, $3, 'DIGITAL')       
-         RETURNING *`,                       
+         RETURNING *`,
 
         [nombre, precio, stock]
     );
@@ -79,7 +79,7 @@ async function insertarProductoDigital(ProductoDigital) {
 
         `INSERT INTO productos_digitales (producto_id, tamano_descarga_mb)
          VALUES ($1, $2)       
-         RETURNING *`,                       
+         RETURNING *`,
 
         // $1 = productoId, $2 = tamaño de descarga en MB.
         [productoId, tamañoDescarga]
@@ -90,7 +90,7 @@ async function insertarProductoDigital(ProductoDigital) {
     // - El tamaño de descarga específico del digital.
     return {
         // OJO: aquí debería ser resultProd.rows[0], ver notas de error.
-        ...resultProd[0], 
+        ...resultProd[0],
         tamano_descarga_mb: resultProdDigital.rows[0].tamano_descarga_mb
     };
 }
@@ -122,6 +122,62 @@ async function obtenerTodos() {
     return result.rows;
 }
 
+async function obtenerPorId(id) {
+
+    const result = await pool.query(
+
+        `SELECT p.id, p.nombre, p.precio, p.stock, p.tipo,
+           d.tamano_descarga_mb
+           FROM productos p
+           LEFT JOIN productos_digitales d ON d.producto_id = p.id
+           WHERE p.id = $1`, [id]
+    );
+    return result.rows[0] || null;
+
+}
+
+
+async function actualizarProducto(id, datos) {
+
+    const { nombre, precio, stock } = datos;
+
+    const result = await pool.query(
+
+        `UPDATE productos
+       SET nombre = $1,
+           precio = $2,
+           stock = $3
+       WHERE id = $4
+       RETURNING *`,
+        [nombre, precio, stock, id]
+    );
+
+    return result.rows[0] || null;
+}
+
+async function actualizarProductoDigital(id, tamanoDescarga) {
+
+
+    const result = await pool.query(
+        `UPDATE productos_digitales
+    SET tamano_descarga_mb = $1
+    WHERE producto_id = $2
+    RETURNING *`,
+        [tamanoDescarga, id]
+    );
+    return result.rows[0] || null;
+
+}
+
+async function borrarProducto(id){
+
+    await pool.query(        
+        `DELETE FROM productos
+        WHERE id = $1`,
+        [id]
+    );
+
+}
 
 // Exportamos las funciones que queremos usar desde otros archivos.
 // (Ahora mismo se exportan solo insertarProducto y insertarProductoDigital;
@@ -129,5 +185,9 @@ async function obtenerTodos() {
 module.exports = {
     insertarProducto,
     insertarProductoDigital,
-    obtenerTodos
+    obtenerTodos,
+    obtenerPorId,
+    actualizarProducto,
+    actualizarProductoDigital,
+    borrarProducto
 };

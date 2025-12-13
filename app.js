@@ -34,6 +34,94 @@ app.get("/", (req, res) => {
   res.redirect("/productos");
 });
 
+
+app.get("/productos/nuevo", (req, res) => {
+
+    res.render("productos/nuevo");
+
+});
+
+
+app.post("/productos", async (req, res) =>{
+
+    try{
+
+        const { nombre, precio, stock} = req.body;
+
+        const producto = { nombre, precio: Number(precio), stock: Number(stock)};
+
+        await pDAO.insertarProducto(producto);
+
+        res.redirect("/productos");
+
+    } catch (err) {
+
+        console.error("error al crear producto: ", err);
+        res.status(500).send("error al crear producto");
+
+    }
+
+});
+
+
+app.get("/productos/:id/editar", async (req, res) => {
+
+    try {
+      const id = Number(req.params.id);
+      const producto = await pDAO.obtenerPorId(id);
+
+      if (!producto){
+        return res.status(404).send("Producto no encontrado");
+      }
+
+      res.render("productos/editar", { producto } );
+
+
+    }catch(err){
+        console.error("error al crear producto: ", err);
+        res.status(500).send("error al crear producto");
+    }
+
+
+} );
+
+
+app.post("/productos/:id/editar", async (req, res) => {
+
+    try{
+        const id= Number(req.params.id);
+        const { nombre, precio, stock} = req.body;
+
+        await pDAO.actualizarProducto(id, 
+            {nombre, 
+            precio: Number(precio), 
+            stock: Number(stock)});
+
+        res.redirect("/productos");
+
+    }catch(err){
+        console.error("error al crear producto: ", err);
+        res.status(500).send("error al crear producto");
+    }
+
+
+});
+
+app.post("/productos/:id/borrar", async (req, res) => {
+
+    try{
+
+        const id = Number(req.params.id);
+        await pDAO.borrarProducto(id);
+        res.redirect("/productos");
+
+    }catch(err){
+        console.error("error al crear producto: ", err);
+        res.status(500).send("error al crear producto");
+    }
+
+});
+
 // ---------------------------
 // LANZAR SERVIDOR
 // ---------------------------
