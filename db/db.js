@@ -25,6 +25,8 @@ const pool = new Pool({
     port: 5432
 });
 
+const DATABASE_URL = "postgresql://postgres:adminPopo4.@localhost:5432/productos"
+
 
 // Exportamos el pool para que otros archivos (index.js, repositorios, etc.)
 // puedan usarlo simplemente con: const pool = require("./db");

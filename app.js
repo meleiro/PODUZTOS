@@ -50,7 +50,7 @@ const path = require("path");
  *
  * Aquí lo tratamos como “caja negra”.
  */
-const pDAO = require("./model/ProductosDAO");
+const repo = require("./model/ProductosRepo");
 
 
 /* =============================================================================
@@ -181,7 +181,7 @@ app.get("/productos", async (req, res) => {
      * productos normalmente será un array:
      * [{id, nombre, precio, stock}, ...]
      */
-    const productos = await pDAO.obtenerTodos();
+    const productos = await repo.obtenerTodos();
 
     /**
      * res.render(vista, datos)
@@ -274,7 +274,7 @@ app.post("/productos", async (req, res) => {
     /**
      * Insertamos con el DAO
      */
-    await pDAO.insertarProducto(producto);
+    await repo.insertarProducto(producto);
 
     /**
      * Redirigimos para volver al listado.
@@ -310,7 +310,7 @@ app.get("/productos/:id/editar", async (req, res) => {
     /**
      * Buscar el producto
      */
-    const producto = await pDAO.obtenerPorId(id);
+    const producto = await repo.obtenerPorId(id);
 
     /**
      * Si no existe, devolvemos 404.
@@ -352,7 +352,7 @@ app.post("/productos/:id/editar", async (req, res) => {
      * -----------------------------
      * El DAO decide cómo se actualiza (DB, fichero, memoria...).
      */
-    await pDAO.actualizarProducto(id, {
+    await repo.actualizarProducto(id, {
       nombre,
       precio: Number(precio),
       stock: Number(stock),
@@ -377,7 +377,7 @@ app.post("/productos/:id/editar", async (req, res) => {
 app.post("/productos/:id/borrar", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    await pDAO.borrarProducto(id);
+    await repo.borrarProducto(id);
     res.redirect("/productos");
   } catch (err) {
     console.error("error al crear producto: ", err);
