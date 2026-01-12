@@ -10,9 +10,15 @@ const pgPool = new Pool({
 // Adapter que Prisma 7 necesita
 const adapter = new PrismaPg(pgPool);
 
-// Prisma Client ya “válido” en Prisma 7
+// Prisma Client
 const prisma = new PrismaClient({ adapter });
 
+/**
+ * NOTA IMPORTANTE (adaptación a tu schema.prisma):
+ * - Modelos: productos, productos_digitales
+ * - Relación: productos.productos_digitales es un ARRAY (1-N).
+ *   En tu UI solo se muestra un tamaño, así que tomamos el primero si existe.
+ */
 
 // -------------------------
 // INSERTAR PRODUCTO FÍSICO
@@ -20,47 +26,47 @@ const prisma = new PrismaClient({ adapter });
 async function insertarProducto(producto) {
   const { nombre, precio, stock } = producto;
 
-  const creado = await prisma.producto.create({
+  const creado = await prisma.productos.create({
     data: {
       nombre,
       precio: new Prisma.Decimal(precio),
-      stock,
-      tipo: "FISICO"
-    }
+      stock: Number(stock),
+      tipo: "FISICO",
+    },
   });
 
-  // Para que se parezca a pg: precio como string
   return {
     ...creado,
     precio: creado.precio.toString(),
-    tamano_descarga_mb: null
+    tamano_descarga_mb: null,
   };
 }
 
 // -------------------------
 // INSERTAR PRODUCTO DIGITAL
-// (inserta en dos tablas vía relación)
+// (inserta en productos + productos_digitales)
 // -------------------------
 async function insertarProductoDigital(productoDigital) {
   const { nombre, precio, stock, tamañoDescarga, tamanoDescarga } = productoDigital;
 
-  // Aceptamos ambos nombres por si el formulario manda tamanoDescarga
   const size = tamañoDescarga ?? tamanoDescarga;
 
-  const creado = await prisma.producto.create({
+  const creado = await prisma.productos.create({
     data: {
       nombre,
       precio: new Prisma.Decimal(precio),
-      stock,
+      stock: Number(stock),
       tipo: "DIGITAL",
-      digital: {
+      productos_digitales: {
         create: {
-          tamanoDescargaMb: Number(size)
-        }
-      }
+          tamano_descarga_mb: Number(size),
+        },
+      },
     },
-    include: { digital: true }
+    include: { productos_digitales: true },
   });
+
+  const firstDigital = creado.productos_digitales?.[0];
 
   return {
     id: creado.id,
@@ -68,40 +74,44 @@ async function insertarProductoDigital(productoDigital) {
     precio: creado.precio.toString(),
     stock: creado.stock,
     tipo: creado.tipo,
-    tamano_descarga_mb: creado.digital?.tamanoDescargaMb ?? null
+    tamano_descarga_mb: firstDigital ? firstDigital.tamano_descarga_mb : null,
   };
 }
 
 // -------------------------
 // OBTENER TODOS
-// (devuelve como tu SELECT con LEFT JOIN)
 // -------------------------
 async function obtenerTodos() {
-  const items = await prisma.producto.findMany({
-    include: { digital: true },
-    orderBy: { id: "asc" }
+  const items = await prisma.productos.findMany({
+    include: { productos_digitales: true },
+    orderBy: { id: "asc" },
   });
 
-  return items.map(p => ({
-    id: p.id,
-    nombre: p.nombre,
-    precio: p.precio.toString(),
-    stock: p.stock,
-    tipo: p.tipo,
-    tamano_descarga_mb: p.digital ? p.digital.tamanoDescargaMb : null
-  }));
+  return items.map((p) => {
+    const firstDigital = p.productos_digitales?.[0];
+    return {
+      id: p.id,
+      nombre: p.nombre,
+      precio: p.precio.toString(),
+      stock: p.stock,
+      tipo: p.tipo,
+      tamano_descarga_mb: firstDigital ? firstDigital.tamano_descarga_mb : null,
+    };
+  });
 }
 
 // -------------------------
 // OBTENER POR ID
 // -------------------------
 async function obtenerPorId(id) {
-  const p = await prisma.producto.findUnique({
+  const p = await prisma.productos.findUnique({
     where: { id: Number(id) },
-    include: { digital: true }
+    include: { productos_digitales: true },
   });
 
   if (!p) return null;
+
+  const firstDigital = p.productos_digitales?.[0];
 
   return {
     id: p.id,
@@ -109,51 +119,54 @@ async function obtenerPorId(id) {
     precio: p.precio.toString(),
     stock: p.stock,
     tipo: p.tipo,
-    tamano_descarga_mb: p.digital ? p.digital.tamanoDescargaMb : null
+    tamano_descarga_mb: firstDigital ? firstDigital.tamano_descarga_mb : null,
   };
 }
 
 // -------------------------
-// ACTUALIZAR PRODUCTO (campos comunes)
+// ACTUALIZAR PRODUCTO (común)
 // -------------------------
 async function actualizarProducto(id, datos) {
   const { nombre, precio, stock } = datos;
 
-  const actualizado = await prisma.producto.update({
+  const actualizado = await prisma.productos.update({
     where: { id: Number(id) },
     data: {
       nombre,
       precio: new Prisma.Decimal(precio),
-      stock: Number(stock)
-    }
+      stock: Number(stock),
+    },
   });
 
   return {
     ...actualizado,
-    precio: actualizado.precio.toString()
+    precio: actualizado.precio.toString(),
   };
 }
 
 // -------------------------
-// ACTUALIZAR TAMAÑO DIGITAL
+// ACTUALIZAR TAMAÑO DIGITAL (por producto_id)
 // -------------------------
 async function actualizarTamanoDigital(idProducto, tamanoDescargaMb) {
-  const actualizado = await prisma.productoDigital.update({
-    where: { productoId: Number(idProducto) },
-    data: { tamanoDescargaMb: Number(tamanoDescargaMb) }
+  const digital = await prisma.productos_digitales.findFirst({
+    where: { producto_id: Number(idProducto) },
+    orderBy: { id: "asc" },
   });
 
-  // Tu DAO devuelve la fila de productos_digitales
-  return actualizado;
+  if (!digital) return null;
+
+  return prisma.productos_digitales.update({
+    where: { id: digital.id },
+    data: { tamano_descarga_mb: Number(tamanoDescargaMb) },
+  });
 }
 
 // -------------------------
-// BORRAR PRODUCTO
-// (Cascade borra el digital si existe)
+// BORRAR PRODUCTO (Cascade borra digitales)
 // -------------------------
 async function borrarProducto(id) {
-  await prisma.producto.delete({
-    where: { id: Number(id) }
+  await prisma.productos.delete({
+    where: { id: Number(id) },
   });
 }
 
@@ -172,5 +185,5 @@ module.exports = {
   actualizarProducto,
   actualizarTamanoDigital,
   borrarProducto,
-  cerrar
+  cerrar,
 };
