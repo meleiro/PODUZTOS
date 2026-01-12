@@ -50,6 +50,7 @@ const path = require("path");
  *
  * Aquí lo tratamos como “caja negra”.
  */
+require("dotenv").config();
 const repo = require("./model/ProductosRepo");
 
 
