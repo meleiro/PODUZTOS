@@ -2,174 +2,175 @@ const { PrismaClient, Prisma } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const { Pool } = require("pg");
 
-/* ============================
-   CONEXIÓN A POSTGRES + PRISMA
-   ============================ */
-
+// Pool de PG usando la misma DATABASE_URL
 const pgPool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// Adapter que Prisma 7 necesita
 const adapter = new PrismaPg(pgPool);
+
+// Prisma Client ya “válido” en Prisma 7
 const prisma = new PrismaClient({ adapter });
 
-/* ============================
-   HELPERS DE FORMATEO
-   ============================ */
 
-/**
- * Convierte un registro de "productos" (con include de productos_digitales)
- * a un objeto listo para JSON (Decimal -> string).
- */
-function normalizarProducto(p) {
-  const primerDigital = (p.productos_digitales && p.productos_digitales.length > 0)
-    ? p.productos_digitales[0]
-    : null;
+// -------------------------
+// INSERTAR PRODUCTO FÍSICO
+// -------------------------
+async function insertarProducto(producto) {
+  const { nombre, precio, stock } = producto;
 
+  const creado = await prisma.producto.create({
+    data: {
+      nombre,
+      precio: new Prisma.Decimal(precio),
+      stock,
+      tipo: "FISICO"
+    }
+  });
+
+  // Para que se parezca a pg: precio como string
   return {
-    id: p.id,
-    nombre: p.nombre,
-    precio: p.precio.toString(), // Decimal => string para JSON
-    stock: p.stock,
-    tipo: p.tipo,
-    tamano_descarga_mb: primerDigital ? primerDigital.tamano_descarga_mb : null,
+    ...creado,
+    precio: creado.precio.toString(),
+    tamano_descarga_mb: null
   };
 }
 
-/* ============================
-   OBTENER TODOS
-   ============================ */
+// -------------------------
+// INSERTAR PRODUCTO DIGITAL
+// (inserta en dos tablas vía relación)
+// -------------------------
+async function insertarProductoDigital(productoDigital) {
+  const { nombre, precio, stock, tamañoDescarga, tamanoDescarga } = productoDigital;
 
-async function obtenerTodos() {
-  const items = await prisma.productos.findMany({
-    include: { productos_digitales: true }, // relación real del schema
-    orderBy: { id: "asc" },
+  // Aceptamos ambos nombres por si el formulario manda tamanoDescarga
+  const size = tamañoDescarga ?? tamanoDescarga;
+
+  const creado = await prisma.producto.create({
+    data: {
+      nombre,
+      precio: new Prisma.Decimal(precio),
+      stock,
+      tipo: "DIGITAL",
+      digital: {
+        create: {
+          tamanoDescargaMb: Number(size)
+        }
+      }
+    },
+    include: { digital: true }
   });
 
-  return items.map(normalizarProducto);
+  return {
+    id: creado.id,
+    nombre: creado.nombre,
+    precio: creado.precio.toString(),
+    stock: creado.stock,
+    tipo: creado.tipo,
+    tamano_descarga_mb: creado.digital?.tamanoDescargaMb ?? null
+  };
 }
 
-/* ============================
-   OBTENER POR ID
-   ============================ */
+// -------------------------
+// OBTENER TODOS
+// (devuelve como tu SELECT con LEFT JOIN)
+// -------------------------
+async function obtenerTodos() {
+  const items = await prisma.producto.findMany({
+    include: { digital: true },
+    orderBy: { id: "asc" }
+  });
 
+  return items.map(p => ({
+    id: p.id,
+    nombre: p.nombre,
+    precio: p.precio.toString(),
+    stock: p.stock,
+    tipo: p.tipo,
+    tamano_descarga_mb: p.digital ? p.digital.tamanoDescargaMb : null
+  }));
+}
+
+// -------------------------
+// OBTENER POR ID
+// -------------------------
 async function obtenerPorId(id) {
-  const p = await prisma.productos.findUnique({
+  const p = await prisma.producto.findUnique({
     where: { id: Number(id) },
-    include: { productos_digitales: true },
+    include: { digital: true }
   });
 
   if (!p) return null;
 
-  return normalizarProducto(p);
+  return {
+    id: p.id,
+    nombre: p.nombre,
+    precio: p.precio.toString(),
+    stock: p.stock,
+    tipo: p.tipo,
+    tamano_descarga_mb: p.digital ? p.digital.tamanoDescargaMb : null
+  };
 }
 
-/* ============================
-   ACTUALIZAR PRODUCTO (BÁSICO)
-   ============================ */
-
+// -------------------------
+// ACTUALIZAR PRODUCTO (campos comunes)
+// -------------------------
 async function actualizarProducto(id, datos) {
   const { nombre, precio, stock } = datos;
 
-  const actualizado = await prisma.productos.update({
+  const actualizado = await prisma.producto.update({
     where: { id: Number(id) },
     data: {
       nombre,
       precio: new Prisma.Decimal(precio),
-      stock: Number(stock),
-    },
+      stock: Number(stock)
+    }
   });
 
   return {
     ...actualizado,
-    precio: actualizado.precio.toString(),
+    precio: actualizado.precio.toString()
   };
 }
 
-/* ============================
-   ACTUALIZAR PRODUCTO DIGITAL
-   ============================ */
-
-/**
- * Actualiza el tamaño de descarga para el/los registros digitales
- * asociados a un producto (por producto_id).
- *
- */
-async function actualizarProductoDigitalPorProductoId(productoId, tamanoDescarga) {
-  const resultado = await prisma.productos_digitales.updateMany({
-    where: { producto_id: Number(productoId) },
-    data: { tamano_descarga_mb: Number(tamanoDescarga) },
+// -------------------------
+// ACTUALIZAR TAMAÑO DIGITAL
+// -------------------------
+async function actualizarTamanoDigital(idProducto, tamanoDescargaMb) {
+  const actualizado = await prisma.productoDigital.update({
+    where: { productoId: Number(idProducto) },
+    data: { tamanoDescargaMb: Number(tamanoDescargaMb) }
   });
 
-  // resultado = { count: X } indicando cuántas filas modificó
-  return resultado;
+  // Tu DAO devuelve la fila de productos_digitales
+  return actualizado;
 }
 
-/* ============================
-   BORRAR PRODUCTO
-   ============================ */
-
-/**
- * Gracias a onDelete: Cascade en la relación,
- * al borrar un producto se borran también sus productos_digitales.
- */
+// -------------------------
+// BORRAR PRODUCTO
+// (Cascade borra el digital si existe)
+// -------------------------
 async function borrarProducto(id) {
-  await prisma.productos.delete({
-    where: { id: Number(id) },
+  await prisma.producto.delete({
+    where: { id: Number(id) }
   });
 }
 
-/* ============================
-   INSERTAR PRODUCTO FÍSICO
-   ============================ */
-
-async function insertarProducto(producto) {
-  const { nombre, precio, stock } = producto;
-
-  const creado = await prisma.productos.create({
-    data: {
-      nombre,
-      precio: new Prisma.Decimal(precio),
-      stock: Number(stock),
-      tipo: "FISICO",
-    },
-  });
-
-  return {
-    ...creado,
-    precio: creado.precio.toString(),
-  };
+// -------------------------
+// Cerrar prisma (para SIGINT)
+// -------------------------
+async function cerrar() {
+  await prisma.$disconnect();
 }
 
-/* ============================
-   INSERTAR PRODUCTO DIGITAL
-   ============================ */
-
-/**
- * Crea un producto y, además, un registro en productos_digitales
- * a través de la relación (array) productos_digitales[].
- */
-async function insertarProductoDigital(productoDigital) {
-  const { nombre, precio, stock, tamanoDescarga } = productoDigital;
-
-  const creado = await prisma.productos.create({
-    data: {
-      nombre,
-      precio: new Prisma.Decimal(precio),
-      stock: Number(stock),
-      tipo: "DIGITAL",
-
-     
-      productos_digitales: {
-        create: [
-          {
-            tamano_descarga_mb: Number(tamanoDescarga),
-          },
-        ],
-      },
-    },
-    include: { productos_digitales: true },
-  });
-
-  return normalizarProducto(creado);
-}
+module.exports = {
+  insertarProducto,
+  insertarProductoDigital,
+  obtenerTodos,
+  obtenerPorId,
+  actualizarProducto,
+  actualizarTamanoDigital,
+  borrarProducto,
+  cerrar
+};
